@@ -1,0 +1,16 @@
+{
+  "name": "opencode-tool-cli",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.ts",
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  },
+  "scripts": {
+    "start": "ts-node index.ts"
+  }
+}
