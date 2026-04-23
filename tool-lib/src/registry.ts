@@ -1,5 +1,5 @@
 import z from "zod";
-import { ToolDef, ToolContext, ExecuteResult, Metadata } from "./types";
+import type { ToolDef, ToolContext, ExecuteResult, Metadata } from "./types.ts";
 
 export class ToolRegistry {
   private tools = new Map<string, ToolDef>();
