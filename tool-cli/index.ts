@@ -60,7 +60,26 @@ async function main() {
   await fs.mkdir(sessionDir, { recursive: true });
   await fs.writeFile(path.join(sessionDir, "system_prompt.txt"), systemPrompt);
 
-  const userQuery = process.argv.slice(2).join(" ");
+  const args = process.argv.slice(2);
+  let quietLevel = -1;
+  let qValueIndex = -1;
+  const qIndex = args.findIndex(arg => arg === "-q" || arg === "--quiet");
+  if (qIndex !== -1) {
+    const nextArg = args[qIndex + 1];
+    if (nextArg && /^\d+$/.test(nextArg)) {
+      quietLevel = parseInt(nextArg, 10);
+      qValueIndex = qIndex + 1;
+    } else {
+      quietLevel = 0;
+    }
+  }
+  const userQuery = args
+    .filter((arg, index) => {
+      if (arg.startsWith("-")) return false;
+      if (index === qValueIndex) return false;
+      return true;
+    })
+    .join(" ");
   if (!userQuery) {
     console.error("Please provide a query as a command line argument");
     process.exit(1);
@@ -122,7 +141,9 @@ async function main() {
     for (const part of message.parts || []) {
       if (part.text) {
         if (part.thought) {
-          console.log(chalk.gray(part.text));
+          if (quietLevel < 1) {
+            console.log(chalk.gray(part.text));
+          }
         } else if (toolCalls.length > 0) {
           console.log(chalk.yellow(part.text));
         } else {
@@ -144,8 +165,10 @@ async function main() {
       const spinner = ora(`Executing ${chalk.cyan(toolId)}...`).start();
       try {
         const result = await registry.execute(toolId, args as any, ctx);
-        spinner.succeed(`Executed ${chalk.cyan(toolId)}`);
-        console.log(chalk.blue(`${result.output.substring(0, 500)}${result.output.length > 500 ? "..." : ""}`));
+        if (spinner) spinner.succeed(`Executed ${chalk.cyan(toolId)}`);
+        if (quietLevel < 0) {
+          console.log(chalk.blue(`${result.output.substring(0, 500)}${result.output.length > 500 ? "..." : ""}`));
+        }
         
         functionResponseParts.push({
           functionResponse: {
@@ -154,8 +177,10 @@ async function main() {
           }
         });
       } catch (e: any) {
-        spinner.fail(`Error executing ${chalk.cyan(toolId)}`);
-        console.log(chalk.red(`Error: ${e.message}`));
+        if (spinner) spinner.fail(`Error executing ${chalk.cyan(toolId)}`);
+        if (quietLevel < 0) {
+          console.log(chalk.red(`Error: ${e.message}`));
+        }
         
         functionResponseParts.push({
           functionResponse: {
@@ -174,6 +199,8 @@ async function main() {
       await fs.writeFile(path.join(sessionDir, "history.json"), JSON.stringify(messages, null, 2));
     }
   }
+
+  console.log(chalk.gray(`Session ID: ${sessionId}`));
 }
 
 main().catch(console.error);

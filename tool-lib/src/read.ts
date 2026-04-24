@@ -74,8 +74,11 @@ export const ReadTool: ToolDef = {
       }
 
       // Binary check
-      const sample = await fsPromises.readFile(filePath, { start: 0, end: 4095 });
-      if (isBinaryFile(sample)) {
+      const handle = await fsPromises.open(filePath, "r");
+      const sample = Buffer.alloc(4096);
+      const { bytesRead } = await handle.read(sample, 0, 4096, 0);
+      await handle.close();
+      if (isBinaryFile(sample.subarray(0, bytesRead))) {
         throw new Error(`Cannot read binary file: ${filePath}`);
       }
 
