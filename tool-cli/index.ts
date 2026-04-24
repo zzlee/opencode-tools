@@ -11,13 +11,13 @@ import {
   GlobTool, 
   EditTool, 
   GrepTool, 
-  WriteTool, 
+  WriteTool,
+  ApplyPatchTool,
 } from "../tool-lib/src/index.ts";
 import type { ToolContext } from "../tool-lib/src/index.ts";
 
 async function main() {
   const apiKey = process.env.AI_API_KEY;
-  const baseUrl = process.env.AI_BASE_URL;
 
   if (!apiKey) {
     console.error("Missing AI_API_KEY environment variable");
@@ -26,7 +26,6 @@ async function main() {
 
   const ai = new GoogleGenAI({
     apiKey: apiKey,
-    httpOptions: baseUrl ? { baseUrl } : undefined,
   });
 
   const registry = new ToolRegistry();
@@ -36,6 +35,7 @@ async function main() {
   registry.register(EditTool);
   registry.register(GrepTool);
   registry.register(WriteTool);
+  registry.register(ApplyPatchTool);
 
   const tools: any[] = [{
     functionDeclarations: registry.listTools().map(t => ({
@@ -69,14 +69,41 @@ async function main() {
   };
 
   while (true) {
-    const response = await ai.models.generateContent({
-      model: process.env.AI_MODEL || "gemini-2.5-flash",
-      contents: messages,
-      config: {
-        tools: tools,
-        systemInstruction: { parts: [{ text: systemPrompt }] }
+    let response;
+    let retries = 0;
+    const maxRetries = 3;
+
+    while (true) {
+      try {
+        response = await ai.models.generateContent({
+          model: process.env.AI_MODEL || "gemini-2.5-flash",
+          contents: messages,
+          config: {
+            tools: tools,
+            systemInstruction: { parts: [{ text: systemPrompt }] }
+          }
+        });
+        break;
+      } catch (e: any) {
+        if (e.status && retries < maxRetries) {
+          retries++;
+          console.log(chalk.yellow(`API Error ${e.status}, retrying in 3s... (${retries}/${maxRetries})`));
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          continue;
+        }
+        if (e.status) {
+          try {
+            const parsed = JSON.parse(e.message);
+            console.error(chalk.red(`API Error ${parsed.error.code}: ${parsed.error.message}`));
+          } catch {
+            console.error(chalk.red(`API Error ${e.status}: ${e.message}`));
+          }
+        } else {
+          console.error(chalk.red(`Error: ${e.message}`));
+        }
+        process.exit(1);
       }
-    });
+    }
 
     const message = response.candidates![0].content!;
     messages.push(message);
@@ -88,7 +115,7 @@ async function main() {
         if (part.thought) {
           console.log(chalk.gray(part.text));
         } else if (toolCalls.length > 0) {
-          console.log(chalk.gray(part.text));
+          console.log(chalk.yellow(part.text));
         } else {
           console.log(part.text);
         }
@@ -109,7 +136,7 @@ async function main() {
       try {
         const result = await registry.execute(toolId, args as any, ctx);
         spinner.succeed(`Executed ${chalk.cyan(toolId)}`);
-        console.log(chalk.gray(`Tool use: ${result.output.substring(0, 500)}${result.output.length > 500 ? "..." : ""}`));
+        console.log(chalk.blue(`${result.output.substring(0, 500)}${result.output.length > 500 ? "..." : ""}`));
         
         functionResponseParts.push({
           functionResponse: {

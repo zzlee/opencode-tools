@@ -1,0 +1,33 @@
+Use the `apply_patch` tool to edit files. Your patch language is a stripped‑down, file‑oriented diff format designed to be easy to parse and safe to apply. You can think of it as a high‑level envelope:
+
+Each patch starts with `*** Begin Patch` and ends with `*** End Patch`.
+Between these markers, you can specify changes to files:
+
+1. To add a new file:
+*** Add File: path/to/file
++ line 1
++ line 2
++ line 3
+
+2. To delete a file:
+*** Delete File: path/to/file
+
+3. To update a file:
+*** Update File: path/to/file
+@@ context
+  existing line 1
+- line to remove
++ line to add
+  existing line 2
+
+You can also move a file during an update:
+*** Update File: old/path/to/file
+*** Move to: new/path/to/file
+@@ context
+...
+
+Marker lines starting with `***` are used to separate different file changes.
+Lines starting with `+` in an 'Add' or 'Update' block are additions.
+Lines starting with `-` in an 'Update' block are removals.
+Lines starting with a space ` ` in an 'Update' block are context lines that must match the original file.
+`*** End of File` can be used in update chunks to anchor the match to the end of the file.

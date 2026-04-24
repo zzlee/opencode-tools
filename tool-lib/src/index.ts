@@ -6,6 +6,7 @@ export * from "./glob.ts";
 export * from "./edit.ts";
 export * from "./grep.ts";
 export * from "./write.ts";
+export * from "./apply_patch.ts";
 
 
 
