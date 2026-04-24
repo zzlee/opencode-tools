@@ -1,5 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import * as os from "node:os";
+import * as crypto from "node:crypto";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import "dotenv/config";
 import chalk from "chalk";
@@ -52,6 +55,11 @@ async function main() {
 
   const systemPrompt = `${defaultPrompt}\n\nAvailable Tools:\n${toolDescriptions}`;
 
+  const sessionId = crypto.randomUUID();
+  const sessionDir = path.join(os.homedir(), ".local-tools", "sessions", sessionId);
+  await fs.mkdir(sessionDir, { recursive: true });
+  await fs.writeFile(path.join(sessionDir, "system_prompt.txt"), systemPrompt);
+
   const userQuery = process.argv.slice(2).join(" ");
   if (!userQuery) {
     console.error("Please provide a query as a command line argument");
@@ -63,8 +71,8 @@ async function main() {
   ];
 
   const ctx: ToolContext = {
-    sessionID: "session-123",
-    messageID: "msg-456",
+    sessionID: sessionId,
+    messageID: crypto.randomUUID(),
     agent: "assistant",
   };
 
@@ -107,6 +115,7 @@ async function main() {
 
     const message = response.candidates![0].content!;
     messages.push(message);
+    await fs.writeFile(path.join(sessionDir, "history.json"), JSON.stringify(messages, null, 2));
 
     const toolCalls = response.functionCalls || [];
 
@@ -162,6 +171,7 @@ async function main() {
         role: "user",
         parts: functionResponseParts,
       });
+      await fs.writeFile(path.join(sessionDir, "history.json"), JSON.stringify(messages, null, 2));
     }
   }
 }
